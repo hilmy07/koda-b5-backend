@@ -2,40 +2,123 @@ package main
 
 import (
 	"net/http"
+	"regexp"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
-type Login struct {
-  User     string `form:"user" json:"user" xml:"user"  binding:"required"`
-  Password string `form:"password" json:"password" xml:"password" binding:"required"`
+// =====================
+// Request Struct
+// =====================
+
+type RegisterRequest struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	Name     string `json:"name" binding:"required"`
 }
+
+type LoginRequest struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+// =====================
+// Regex Validation
+// =====================
+
+var (
+	emailRegex    = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+	letterRegex = regexp.MustCompile(`[A-Za-z]`)
+	digitRegex  = regexp.MustCompile(`[0-9]`)
+	fullRegex   = regexp.MustCompile(`^[A-Za-z0-9]{6,}$`)
+)
+
+func isValidPassword(pw string) bool {
+	return fullRegex.MatchString(pw) &&
+		letterRegex.MatchString(pw) &&
+		digitRegex.MatchString(pw)
+}
+
+// =====================
+// Main
+// =====================
 
 func main() {
-	app := gin.Default()
+	r := gin.Default()
 
-	app.POST("/loginJSON", func(c *gin.Context) {
-    var json Login
-    if err := c.ShouldBindJSON(&json); err != nil {
-      c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-      return
-    }
+	r.POST("/register", registerHandler)
+	r.POST("/login", loginHandler)
 
-	// email := "^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$"
-	// var email = regexp.MustCompile(`^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$`)
-	
-	// var password = regexp.MustCompile(`^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$`)
-
-    if json.User != "hilmy@mail.com" || json.Password != "12345" {
-      c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})
-      return
-    }
-
-    c.JSON(http.StatusOK, gin.H{"status": "you are logged in"})
-  })
-
-//   var email = regexp.MustCompile(`^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$`)
-//   fmt.Println(email)
-  app.Run(":8020")
+	r.Run(":8080")
 }
 
+// =====================
+// Handlers
+// =====================
+
+func registerHandler(c *gin.Context) {
+	var req RegisterRequest
+
+	// ShouldBindWith JSON
+	if err := c.ShouldBindWith(&req, binding.JSON); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request body",
+		})
+		return
+	}
+
+	// Regex validation
+	if !emailRegex.MatchString(req.Email) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "email format tidak valid",
+		})
+		return
+	}
+
+	if !isValidPassword(req.Password) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "password minimal 6 karakter dan harus mengandung angka",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "register berhasil",
+		"data": gin.H{
+			"email": req.Email,
+			"name":  req.Name,
+		},
+	})
+}
+
+func loginHandler(c *gin.Context) {
+	var req LoginRequest
+
+	// ShouldBindWith JSON
+	if err := c.ShouldBindWith(&req, binding.JSON); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request body",
+		})
+		return
+	}
+
+	// Regex validation
+	if !emailRegex.MatchString(req.Email) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "email format tidak valid",
+		})
+		return
+	}
+
+	if req.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "password wajib diisi",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "login berhasil",
+	})
+}
